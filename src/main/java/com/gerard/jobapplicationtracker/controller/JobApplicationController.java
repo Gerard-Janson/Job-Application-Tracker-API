@@ -4,7 +4,6 @@ import com.gerard.jobapplicationtracker.dtos.JobApplicationRequest;
 import com.gerard.jobapplicationtracker.dtos.JobApplicationResponse;
 import com.gerard.jobapplicationtracker.dtos.UpdateStatusRequest;
 import com.gerard.jobapplicationtracker.service.JobApplicationService;
-import com.gerard.jobapplicationtracker.entity.JobApplication;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +12,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController

@@ -257,9 +257,9 @@ All endpoints below require the `Authorization` header.
   "jobDescription": "Build and maintain REST services.",
   "location": "Cape Town, South Africa",
   "jobType": "FULL_TIME",
-  "workNode": "HYBRID",
+  "workMode": "HYBRID",
   "salary": 85000,
-  "post_url": "https://acme.example/careers/backend-engineer",
+  "postUrl": "https://acme.example/careers/backend-engineer",
   "status": "APPLIED",
   "appliedDate": "2026-10-01",
   "nextFollowUpDate": "2026-10-15",
@@ -267,9 +267,6 @@ All endpoints below require the `Authorization` header.
   "updatedAt": "2026-10-19"
 }
 ```
-
-> Note that the response currently uses the field names `workNode` (not `workMode`) and `post_url` (not `postUrl`). See [Known Limitations](#known-limitations).
-
 
 ## Error Handling
 
@@ -315,7 +312,6 @@ src/main/java/com/gerard/jobapplicationtracker
 
 These are worth knowing about, and make good candidates for future improvements:
 
-- **Response field naming:** responses expose `workNode` and `post_url` instead of `workMode` and `postUrl`, so they don't match the request body.
 - **Status notes aren't persisted:** `PATCH /{id}/status` validates the `note` field but does not save it, and there is no status history yet.
 - **CORS** only allows `http://localhost:3000`. Update `SecurityConfig` for other frontends or production origins.
 - **No refresh tokens:** users must sign in again after the 15-minute token expires.
