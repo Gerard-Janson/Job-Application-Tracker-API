@@ -2,6 +2,7 @@ package com.gerard.jobapplicationtracker;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,19 +36,43 @@ class JobApplicationOwnershipTest {
         return JsonPath.read(body, "$.accessToken");
     }
 
-    private void createApplication(String token, String company) throws Exception {
+    private String createAndGetId(String token, String company) throws Exception {
         String json = """
                 {"position":"Dev","company":"%s","jobType":"FULL_TIME","workMode":"REMOTE"}"""
                 .formatted(company);
-        mockMvc.perform(post(BASE)
+        String body = mockMvc.perform(post(BASE)
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(json))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.id");
+    }
+
+    private void createApplication(String token, String company) throws Exception {
+        createAndGetId(token, company);
     }
 
     @Test
     void listWithoutTokenIsUnauthorized() throws Exception {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void duplicateSignUpIsConflict() throws Exception {
+        tokenFor("g@test.com");
+        mockMvc.perform(post(AUTH + "sign-up")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"g@test.com\",\"password\":\"password123\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void wrongPasswordIsUnauthorized() throws Exception {
+        tokenFor("h@test.com");
+        mockMvc.perform(post(AUTH + "sign-in")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"h@test.com\",\"password\":\"wrong-password\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -91,16 +116,20 @@ class JobApplicationOwnershipTest {
                 .andExpect(status().isBadRequest());
     }
 
-    private String createAndGetId(String token, String company) throws Exception {
+    @Test
+    void createReturnsCamelCaseFields() throws Exception {
+        String token = tokenFor("f@test.com");
         String json = """
-            {"position":"Dev","company":"%s","jobType":"FULL_TIME","workMode":"REMOTE"}"""
-                .formatted(company);
-        String body = mockMvc.perform(post(BASE)
+                {"position":"Dev","company":"Acme","jobType":"FULL_TIME","workMode":"HYBRID",
+                 "postUrl":"https://example.com/job"}""";
+        mockMvc.perform(post(BASE)
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.id");
+                .andExpect(jsonPath("$.workMode").value("HYBRID"))
+                .andExpect(jsonPath("$.postUrl").value("https://example.com/job"))
+                .andExpect(jsonPath("$.workNode").doesNotExist())
+                .andExpect(jsonPath("$.post_url").doesNotExist());
     }
 
     @Test
@@ -124,7 +153,6 @@ class JobApplicationOwnershipTest {
         mockMvc.perform(delete(BASE + id).header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isNotFound());
 
-        // untouched for the owner
         mockMvc.perform(get(BASE + id).header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.company").value("Acme"))
