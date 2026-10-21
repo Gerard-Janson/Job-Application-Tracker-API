@@ -61,7 +61,7 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(authEntryPoint))
                 .sessionManagement(s -> s.sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(  a ->
-               a.requestMatchers( "/api/v1/tracker/auth/**").permitAll()
+               a.requestMatchers( "/error","/api/v1/tracker/auth/**","/swagger-ui/index.html","/swagger-ui/**","/v3/api-docs/**", "/swagger-ui.html").permitAll()
                .anyRequest().authenticated());
 
         http.addFilterBefore(authTokenFilter(), UsernamePasswordAuthenticationFilter.class);
