@@ -4,7 +4,12 @@ import com.gerard.jobapplicationtracker.dtos.JobApplicationRequest;
 import com.gerard.jobapplicationtracker.dtos.JobApplicationResponse;
 import com.gerard.jobapplicationtracker.dtos.UpdateStatusRequest;
 import com.gerard.jobapplicationtracker.service.JobApplicationService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +21,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/tracker")
+@SecurityRequirement(name = "bearerAuth")
 public class JobApplicationController {
 
     private final JobApplicationService jobApplicationService;
@@ -25,8 +31,8 @@ public class JobApplicationController {
     }
 
     @GetMapping("/")
-    public List<JobApplicationResponse> getAllJobApplicationsByUserEmail(@AuthenticationPrincipal UserDetails principal) {
-        List<JobApplicationResponse> allApplications = jobApplicationService.findAllByUserEmail(principal.getUsername());
+    public Page<JobApplicationResponse> getAllJobApplicationsByUserEmail(@AuthenticationPrincipal UserDetails principal,@ParameterObject @PageableDefault(size = 10,sort = "id") Pageable pageable) {
+        Page<JobApplicationResponse> allApplications = jobApplicationService.findAllByUserEmail(principal.getUsername(),pageable);
         return ResponseEntity.status(HttpStatus.OK).body(allApplications).getBody();
     }
 

@@ -10,6 +10,8 @@ import com.gerard.jobapplicationtracker.mapper.JobApplicationMapper;
 import com.gerard.jobapplicationtracker.repository.JobApplicationRepository;
 import com.gerard.jobapplicationtracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,11 +42,9 @@ public class JobApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public List<JobApplicationResponse> findAllByUserEmail(String email) {
-        return jobApplicationRepository.findAllByUserEmail(email)
-                .stream()
-                .map(mapper::toResponse)
-                .toList();
+    public Page<JobApplicationResponse> findAllByUserEmail(String email, Pageable pageable) {
+        return jobApplicationRepository.findAllByUserEmail(email,pageable)
+                .map(mapper::toResponse);
     }
 
     @Transactional(readOnly = true)
