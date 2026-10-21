@@ -1,6 +1,6 @@
 # Job Application Tracker API
 
-A RESTful backend for tracking your job search. Register an account, log in, and manage every application you submit, from the first time you save a posting through to an accepted offer. Each user only ever sees and modifies their own data.
+A RESTful backend for tracking your job search. Register an account, sign in, and manage every application you submit, from the first time you save a posting through to an accepted offer. Each user only ever sees and modifies their own data.
 
 Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Data JPA** and **PostgreSQL**.
 
@@ -11,12 +11,14 @@ Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Dat
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
+- [Interactive API Docs (Swagger UI)](#interactive-api-docs-swagger-ui)
 - [Authentication](#authentication)
 - [API Reference](#api-reference)
 - [Error Handling](#error-handling)
 - [Running Tests](#running-tests)
 - [Project Structure](#project-structure)
 - [Known Limitations](#known-limitations)
+- [Roadmap](#roadmap)
 - [License](#license)
 
 ---
@@ -26,12 +28,14 @@ Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Dat
 - **Stateless JWT authentication** with sign-up and sign-in endpoints
 - **BCrypt password hashing**
 - **Full CRUD** for job applications, plus a dedicated status-update endpoint
+- **Pagination and sorting** on the list endpoint via `page`, `size` and `sort` query parameters
 - **Per-user data isolation**: every query is scoped to the authenticated user, and accessing another user's record returns `404` rather than leaking its existence
 - **Request validation** with Jakarta Bean Validation (field lengths, required fields, date rules)
 - **Sensible defaults**: applications created without a status start as `SAVED`
 - **UUID v7 primary keys** for time-sortable, non-guessable identifiers
+- **Interactive API docs** with Swagger UI and a built-in Authorize button for JWTs
 - **CORS** pre-configured for a local frontend on `http://localhost:3000`
-- **Integration tests** covering authentication and ownership rules
+- **Integration tests** covering authentication, ownership rules, pagination and sorting
 
 ## Tech Stack
 
@@ -42,6 +46,7 @@ Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Dat
 | Security    | Spring Security, JJWT 0.12.6                |
 | Persistence | Spring Data JPA / Hibernate, PostgreSQL     |
 | Validation  | Jakarta Bean Validation                     |
+| API docs    | springdoc-openapi 3.0.3 (Swagger UI)        |
 | Build       | Maven (wrapper included)                    |
 | Testing     | JUnit 5, MockMvc, H2 (in-memory)            |
 | Utilities   | Lombok                                      |
@@ -59,7 +64,7 @@ Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Dat
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/Job-Application-Tracker-API.git
+git clone https://github.com/Gerard-Janson/Job-Application-Tracker-API.git
 cd Job-Application-Tracker-API
 ```
 
@@ -74,6 +79,13 @@ Tables are created and updated automatically on startup (`spring.jpa.hibernate.d
 ### 3. Set environment variables
 
 The app reads its secrets from the environment. There are no defaults for the database credentials or the JWT secret, so the app will not start without them.
+
+| Variable      | Required | Description                                                        |
+|---------------|----------|--------------------------------------------------------------------|
+| `DB_USERNAME` | Yes      | PostgreSQL user                                                    |
+| `DB_PASSWORD` | Yes      | PostgreSQL password                                                |
+| `JWT_SECRET`  | Yes      | HMAC signing key, at least 32 characters                           |
+| `DB_URL`      | No       | JDBC URL. Defaults to `jdbc:postgresql://localhost:5432/jobtracker` |
 
 **macOS / Linux**
 
@@ -127,8 +139,9 @@ curl -X POST http://localhost:8080/api/v1/tracker/ \
         "status": "APPLIED"
       }'
 
-# List your applications
-curl http://localhost:8080/api/v1/tracker/ -H "Authorization: Bearer $TOKEN"
+# List your applications (first page, 10 per page, most recently applied first)
+curl "http://localhost:8080/api/v1/tracker/?page=0&size=10&sort=appliedDate,desc" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Build a runnable JAR
@@ -140,6 +153,27 @@ java -jar target/jobapplicationtracker-0.0.1-SNAPSHOT.jar
 
 ---
 
+## Interactive API Docs (Swagger UI)
+
+With the app running, open **<http://localhost:8080/swagger-ui.html>**. The raw OpenAPI document is at `/v3/api-docs`.
+
+To call protected endpoints from the page:
+
+1. Expand **POST `/api/v1/tracker/auth/sign-in`**, click **Try it out**, enter your credentials and click **Execute**.
+2. Copy the `accessToken` value from the response.
+3. Click **Authorize** at the top right, paste the token (without the word `Bearer`) and confirm.
+4. Try any job application endpoint. The token expires after 30 minutes, after which you sign in and authorize again.
+
+Swagger UI is controlled by two properties in `application.properties`:
+
+```properties
+springdoc.api-docs.enabled=true
+springdoc.swagger-ui.enabled=true
+```
+
+Set both to `false` for production deployments.
+
+---
 
 ## Authentication
 
@@ -153,7 +187,9 @@ The API uses stateless **Bearer token** authentication.
 Authorization: Bearer <accessToken>
 ```
 
-Tokens expire after 15 minutes by default (see `expiresIn` in the sign-in response, in seconds). Once a token expires, sign in again. Only the `/api/v1/tracker/auth/**` endpoints are public; everything else requires a valid token.
+Tokens expire after 30 minutes by default (`jwt.expiration` in `application.properties`, in milliseconds; the sign-in response reports the lifetime in seconds as `expiresIn`). Once a token expires, sign in again.
+
+Public endpoints: `/api/v1/tracker/auth/**`, Swagger UI and the OpenAPI document. Everything else requires a valid token.
 
 ---
 
@@ -196,7 +232,7 @@ Create a new account. Emails are trimmed and lower-cased before being stored.
 {
   "accessToken": "eyJhbGciOiJIUzM4NCJ9...",
   "tokenType": "Bearer",
-  "expiresIn": 900
+  "expiresIn": 1800
 }
 ```
 
@@ -208,14 +244,54 @@ All endpoints below require the `Authorization` header.
 
 | Method   | Endpoint        | Description                           | Success          |
 |----------|-----------------|---------------------------------------|------------------|
-| `GET`    | `/`             | List all of your applications         | `200 OK`         |
+| `GET`    | `/`             | List your applications (paginated)    | `200 OK`         |
 | `POST`   | `/`             | Create an application                 | `201 Created`    |
 | `GET`    | `/{id}`         | Get one application                   | `200 OK`         |
 | `PUT`    | `/{id}`         | Replace an application's details      | `200 OK`         |
 | `PATCH`  | `/{id}/status`  | Update only the status                | `200 OK`         |
 | `DELETE` | `/{id}`         | Delete an application                 | `204 No Content` |
 
-`{id}` is a UUID. An unknown id, or an id belonging to another user, returns `404 Not Found`.
+`{id}` is a UUID. An unknown id, or an id belonging to another user, returns `404 Not Found`. A malformed id returns `400 Bad Request`.
+
+#### List query parameters (`GET /`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `page`    | `0`     | Zero-based page index |
+| `size`    | `10`    | Items per page |
+| `sort`    | `id`    | `field,direction`, for example `sort=salary,desc`. Repeat the parameter to sort by several fields. |
+
+Sortable fields: `position`, `company`, `location`, `salary`, `status`, `appliedDate`, `nextFollowUpDate`, `createdAt`.
+
+```bash
+# Second page of 5, highest salary first
+curl "http://localhost:8080/api/v1/tracker/?page=1&size=5&sort=salary,desc" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response `200 OK`**
+
+```json
+{
+  "content": [
+    {
+      "id": "0199e5a2-7c3b-7d1e-9f4a-2b8c6d5e1a30",
+      "position": "Backend Engineer",
+      "company": "Acme Corp",
+      "status": "APPLIED",
+      "...": "same fields as the single-application response below"
+    }
+  ],
+  "page": {
+    "size": 10,
+    "number": 0,
+    "totalElements": 3,
+    "totalPages": 1
+  }
+}
+```
+
+A page number past the last page returns an empty `content` array.
 
 #### Create / update request body (`POST /`, `PUT /{id}`)
 
@@ -234,7 +310,30 @@ All endpoints below require the `Authorization` header.
   "nextFollowUpDate": "2026-10-15"
 }
 ```
+
+| Field              | Rules                                              |
+|--------------------|----------------------------------------------------|
+| `position`         | Required, not blank, max 255 characters            |
+| `company`          | Required, not blank, max 500 characters            |
+| `jobDescription`   | Optional, max 255 characters                       |
+| `location`         | Optional, max 500 characters                       |
+| `jobType`          | Required, see [Enum values](#enum-values)          |
+| `workMode`         | Required, see [Enum values](#enum-values)          |
+| `salary`           | Optional, must be greater than 0                   |
+| `postUrl`          | Optional, max 500 characters                       |
+| `status`           | Optional, defaults to `SAVED` on create            |
+| `appliedDate`      | Optional, today or in the past                     |
+| `nextFollowUpDate` | Optional, today or in the future                   |
+
 > **`PUT` semantics:** the request body overwrites all fields. Optional fields you omit are set to `null`. The one exception is `status`, which is left unchanged if omitted.
+
+#### Enum values
+
+| Field      | Allowed values                                                                                  |
+|------------|-------------------------------------------------------------------------------------------------|
+| `jobType`  | `FULL_TIME`, `PART_TIME`, `CONTRACT`, `INTERNSHIP`                                              |
+| `workMode` | `REMOTE`, `ONSITE`, `HYBRID`                                                                    |
+| `status`   | `SAVED`, `APPLIED`, `INTERVIEW`, `OFFER_LETTER`, `OFFER_ACCEPTED`, `OFFER_REJECTED`, `REJECTED`, `HIRED` |
 
 #### Update status (`PATCH /{id}/status`)
 
@@ -268,14 +367,27 @@ All endpoints below require the `Authorization` header.
 }
 ```
 
+---
+
 ## Error Handling
 
 | Status                     | When                                                                |
 |----------------------------|---------------------------------------------------------------------|
-| `400 Bad Request`          | Validation failed (missing required field, bad format, etc.)        |
+| `400 Bad Request`          | Validation failed, malformed id, or an invalid enum value           |
 | `401 Unauthorized`         | Missing, invalid or expired token, or wrong sign-in credentials     |
 | `404 Not Found`            | Application doesn't exist or belongs to another user                |
 | `409 Conflict`             | Email already registered                                            |
+
+Error responses are returned as small JSON bodies, for example:
+
+```json
+{
+  "timestamp": "2026-10-21T11:04:20.893Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "path": "/api/v1/tracker/auth/sign-in"
+}
+```
 
 ---
 
@@ -288,7 +400,8 @@ All endpoints below require the `Authorization` header.
 Tests run against an in-memory **H2** database using `src/test/resources/application.properties`, so no PostgreSQL instance or environment variables are needed. The suite includes:
 
 - A context-load smoke test
-- Integration tests (`JobApplicationOwnershipTest`) verifying that unauthenticated requests are rejected, users only see their own applications, a missing status defaults to `SAVED`, and invalid requests return `400`
+- `JobApplicationOwnershipTest`: unauthenticated requests are rejected, duplicate sign-up and wrong passwords are handled, users only see their own applications, other users cannot read, update or delete a record, a missing status defaults to `SAVED`, and invalid requests return `400`
+- `JobApplicationPaginationTest`: page size and totals, last and out-of-range pages, the default page size, ascending and descending sorting, and per-user isolation across pages
 
 ---
 
@@ -303,7 +416,11 @@ src/main/java/com/gerard/jobapplicationtracker
 ├── dtos/          Request and response records
 ├── mapper/        Entity <-> DTO mapping
 ├── enums/         Status, Job_type, Work_mode
-└── security/      JWT utilities, auth filter, security and CORS config
+└── security/      JWT utilities, auth filter, security, CORS and OpenAPI config
+
+src/test/java/com/gerard/jobapplicationtracker
+├── JobApplicationOwnershipTest.java    Auth, validation and ownership tests
+└── JobApplicationPaginationTest.java   Pagination and sorting tests
 ```
 
 ---
@@ -313,11 +430,23 @@ src/main/java/com/gerard/jobapplicationtracker
 These are worth knowing about, and make good candidates for future improvements:
 
 - **Status notes aren't persisted:** `PATCH /{id}/status` validates the `note` field but does not save it, and there is no status history yet.
+- **No filtering** on the list endpoint. Results can be paginated and sorted, but not yet filtered by status, company or date.
+- **Validation errors have no per-field detail:** a `400` tells you the request was invalid, not which field failed.
 - **CORS** only allows `http://localhost:3000`. Update `SecurityConfig` for other frontends or production origins.
-- **No refresh tokens:** users must sign in again after the 15-minute token expires.
-- **No pagination, filtering or sorting** on the list endpoint.
+- **No refresh tokens:** users must sign in again after the 30-minute token expires.
+- **Swagger UI is enabled by default** and publicly reachable. Disable it for production (see [Interactive API Docs](#interactive-api-docs-swagger-ui)).
 - **Schema management** uses Hibernate `ddl-auto=update`; a migration tool such as Flyway or Liquibase is recommended for production.
 - **SQL logging** (`spring.jpa.show-sql=true`) is enabled by default and should be turned off in production.
+
+## Roadmap
+
+- Filter the list by status, company and date range
+- Persist status notes and keep a status history per application
+- A global exception handler with consistent, field-level error messages
+- Dockerfile and `docker-compose.yml` for one-command local setup
+- GitHub Actions workflow to run the test suite on every push
+- Flyway migrations in place of `ddl-auto=update`
+- Refresh tokens
 
 ---
 
