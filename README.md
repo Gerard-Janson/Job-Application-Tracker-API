@@ -1,5 +1,7 @@
 # Job Application Tracker API
 
+[![Java CI with Maven](https://github.com/Gerard-Janson/Job-Application-Tracker-API/actions/workflows/maven.yml/badge.svg)](https://github.com/Gerard-Janson/Job-Application-Tracker-API/actions/workflows/maven.yml)
+
 A RESTful backend for tracking your job search. Register an account, sign in, and manage every application you submit, from the first time you save a posting through to an accepted offer. Each user only ever sees and modifies their own data.
 
 Built with **Java 21**, **Spring Boot**, **Spring Security (JWT)**, **Spring Data JPA** and **PostgreSQL**.

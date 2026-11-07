@@ -32,3 +32,17 @@ build/
 ### VS Code ###
 .vscode/
 /src/main/resources/application-local.properties
+
+### Secrets / environment ###
+.env
+.env.*
+!.env.example
+
+### Logs ###
+*.log
+logs/
+
+### OS files ###
+.DS_Store
+Thumbs.db
+desktop.ini
