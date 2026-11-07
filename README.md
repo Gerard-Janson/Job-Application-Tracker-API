@@ -445,8 +445,6 @@ These are worth knowing about, and make good candidates for future improvements:
 - Filter the list by status, company and date range
 - Persist status notes and keep a status history per application
 - A global exception handler with consistent, field-level error messages
-- Dockerfile and `docker-compose.yml` for one-command local setup
-- GitHub Actions workflow to run the test suite on every push
 - Flyway migrations in place of `ddl-auto=update`
 - Refresh tokens
 
